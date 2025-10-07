@@ -1,0 +1,83 @@
+NAME: virenet_6_fold_cv_air400_with_roi_coarse2fine_of
+
+# Cross Validation
+CV:
+  ENABLE_CV: True
+  CV_MODE: train-test  # train-valid or train-test
+  CV_DATASETS: [ 'AIR_125', 'AIR_400' ]
+  CV_FOLD_NUM: 6
+
+DATA_PATH:
+  AIR_125: [air-125-dir-path]
+  AIR_400: [air-400-dir-path]
+  COHFACE: [cohface-dir-path]
+  CACHE_DIR: [your-cache-dir]  # Dir to store preprocessed data
+  OUTPUT_DIR: [your-output-dir]
+  BODY_DETECTOR_PATH: [yolov8-path]
+  FACE_DETECTOR_PATH: [yolov8-face-path]
+
+TRAIN:
+  BATCH_SIZE: 4
+  EPOCHES: 15
+  LR: 1e-3
+  DATA:
+    - DATASET: AIR_400
+      SPLIT_TYPE: ratio  # custom or ratio
+      SPLIT_SUBJECTS: ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07']  # Work only when SPLIT_TYPE = custom
+      SPLIT_RATIO: 0.0  # Work only when SPLIT_TYPE = ratio
+      DATA_FORMAT: &common_data_format NDCHW
+      PREPROCESS: &common_preprocess
+        DO_DOWNSAMPLE_BEFORE_PREPROCESS: True
+        DOWNSAMPLE_SIZE_BEFORE_PREPROCESS: [ 320, 180 ]
+        DATA_NORMALIZE_TYPE: Standardized
+        LABEL_NORMALIZE_TYPE: DiffNormalized
+        FLOW_NORMALIZE_TYPE: Standardized
+        DO_CHUNK: True
+        CHUNK_LENGTH: 180
+        DO_CROP_INFANT_REGION: True
+        DYNAMIC_DETECTION: True
+        DYNAMIC_DETECTION_FREQUENCY: 10
+        INFANT_REGION: Chest  # Body, Face, or Chest
+        BODY_CONF_THRESHOLD: 0.25
+        FACE_CONF_THRESHOLD: 0.5
+        CHEST_SHIFT_ALPHA: 0.2
+        DO_OPTICAL_FLOW: True
+        OF_METHOD: coarse2fine
+        DO_DOWNSAMPLE_BEFORE_TRAINING: True
+        DOWNSAMPLE_SIZE_BEFORE_TRAINING: [ 96, 96 ]
+    - DATASET: AIR_125
+      SPLIT_TYPE: ratio  # custom or ratio
+      SPLIT_SUBJECTS: null  # Work only when SPLIT_TYPE = custom
+      SPLIT_RATIO: 0.0  # Work only when SPLIT_TYPE = ratio
+      DATA_FORMAT: *common_data_format  # Share the same data format for combined datasets
+      PREPROCESS: *common_preprocess  # Share the same preprocess config for combined datasets
+
+MODEL:
+  DROP_RATE: 0.2
+  NAME: VIRENet
+  LOSS: psd_mse
+  FRAME_DEPTH: 10
+  IN_CHANNELS: 3
+
+VALID:
+  DATA:
+    DATASET: AIR_400
+    SPLIT_TYPE: ratio  # custom or ratio
+    SPLIT_SUBJECTS: ['S08', 'S09', 'S10']  # Work only when SPLIT_TYPE = custom
+    SPLIT_RATIO: 0.0  # Work only when SPLIT_TYPE = ratio
+    DATA_FORMAT: *common_data_format
+    PREPROCESS: *common_preprocess
+
+TEST:
+  DATA:
+    DATASET: AIR_400
+    SPLIT_TYPE: ratio  # custom or ratio
+    SPLIT_SUBJECTS: [ 'S08', 'S09', 'S10' ]  # Work only when SPLIT_TYPE = custom
+    SPLIT_RATIO: 0.0  # Work only when SPLIT_TYPE = ratio
+    DATA_FORMAT: *common_data_format
+    PREPROCESS: *common_preprocess
+
+INFERENCE:
+  BATCH_SIZE: 8
+  EVALUATION_METHOD: FFT
+  USE_POST_PROCESS: True

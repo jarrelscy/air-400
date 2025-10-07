@@ -16,6 +16,25 @@ Here we provide our model code, training checkpoints, and annotated dataset to s
 
 ## Requirements & Setup
 
+#### 1. Set up the environment
+```bash
+conda env create -f environment.yml
+```
+
+#### 2. Compile [pyflow](https://github.com/pathak22/pyflow) library and import it as a module
+```bash
+git clone https://github.com/pathak22/pyflow.git
+cd pyflow/
+python setup.py build_ext -i
+```
+Move the compiled `pyflow.cpython-**.so` file to the root directory of this repo, so `pyflow` can be imported directly as a module.
+
+#### 3. Sign W&B and login to record training results
+```bash
+export WANDB_API_KEY=<your_api_key>
+wandb login
+```
+
 ## Quickstart: Inference
 
 (Simple instructions for someone to run a pretrained model on their own video data.)
@@ -28,17 +47,21 @@ Here we provide our model code, training checkpoints, and annotated dataset to s
 
 ## Reproducing Paper Results
 
-#### Preprocessing
+#### 1. Get [AIR-400 dataset]() folder and [ROI detectors]() ready
 
-(Example of how to preprocess AIR-400 video data.)
+#### 2. Update data paths in the config yaml files
 
-#### Training
+#### 3. Preprocess the data
+Specify required config yaml file path in `run.sh`. Then uncomment `--preprocess` after `python main.py --config "$CONFIG"` to enable preprocess-only mode. Run this approach first to make sure dataset is preprocessed correctly before following training and testing.
+```bash
+./run.sh
+```
 
-(Example of how to retrain one of the main models in the paper, on AIR-400 data.)
-
-#### Testing
-
-(How to reproduce the model results from our paper.)f
+#### 4. Start training and testing process
+Comment out `--peprocess` after `python main.py --config "$CONFIG"` in `run.sh` to start training and testing process.
+```bash
+./run.sh
+```
 
 
 

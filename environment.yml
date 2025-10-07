@@ -1,0 +1,21 @@
+name: respenv
+
+channels:
+  - defaults
+  - conda-forge
+
+dependencies:
+  - python=3.9.18
+  - h5py=3.13.0
+  - opencv=4.11.0
+  - tqdm=4.67.1
+  - wandb=0.19.7
+  - ultralytics=8.3.96
+  - imageio=2.37.0
+  - pygifsicle=1.1.0
+  - cython=3.0.11
+  - av=15.0.0
+  - pip
+  - pip:
+    - torch
+    - torchvision

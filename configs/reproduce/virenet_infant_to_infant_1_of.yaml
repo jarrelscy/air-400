@@ -1,0 +1,67 @@
+# Choose 'S01', 'S05' from AIR-125 as the train set, 'S06' as the validate set,
+# and other 5 subjects of AIR-125 as the test split
+
+NAME: virenet_infant_to_infant_1_of
+
+DATA_PATH:
+  AIR_125: [air-125-dir-path]
+  AIR_400: [air-400-dir-path]
+  COHFACE: [cohface-dir-path]
+  CACHE_DIR: [your-cache-dir]  # Dir to store preprocessed data
+  OUTPUT_DIR: [your-output-dir]
+  BODY_DETECTOR_PATH: [yolov8-path]
+  FACE_DETECTOR_PATH: [yolov8-face-path]
+
+TRAIN:
+  BATCH_SIZE: 4
+  EPOCHES: 10
+  LR: 1e-3
+  DATA:
+    DATASET: AIR_125
+    SPLIT_TYPE: custom  # custom or ratio
+    SPLIT_SUBJECTS: [ 'S01', 'S05' ]  # Work only when SPLIT_TYPE = custom
+    SPLIT_RATIO: 0.7  # Work only when SPLIT_TYPE = ratio
+    DATA_FORMAT: &common_data_format NDCHW
+    PREPROCESS: &common_preprocess
+      DO_DOWNSAMPLE_BEFORE_PREPROCESS: True
+      DOWNSAMPLE_SIZE_BEFORE_PREPROCESS: [ 192, 192 ]
+      DATA_NORMALIZE_TYPE: Standardized
+      LABEL_NORMALIZE_TYPE: Standardized
+      FLOW_NORMALIZE_TYPE: Standardized
+      DO_CHUNK: True
+      CHUNK_LENGTH: 60
+      DO_CROP_INFANT_REGION: False
+      DO_OPTICAL_FLOW: True
+      OF_METHOD: coarse2fine
+      DO_DOWNSAMPLE_BEFORE_TRAINING: True
+      DOWNSAMPLE_SIZE_BEFORE_TRAINING: [ 96, 96 ]
+
+MODEL:
+  DROP_RATE: 0.2
+  NAME: VIRENet
+  LOSS: psd_mse
+  FRAME_DEPTH: 10
+  IN_CHANNELS: 3
+
+VALID:
+  DATA:
+    DATASET: AIR_125
+    SPLIT_TYPE: custom  # custom or ratio
+    SPLIT_SUBJECTS: [ 'S06' ]  # Work only when SPLIT_TYPE = custom
+    SPLIT_RATIO: 0.3  # Work only when SPLIT_TYPE = ratio
+    DATA_FORMAT: *common_data_format
+    PREPROCESS: *common_preprocess
+
+TEST:
+  DATA:
+    DATASET: AIR_125
+    SPLIT_TYPE: custom  # custom or ratio
+    SPLIT_SUBJECTS: [ 'S02', 'S03', 'S04', 'S07', 'S08' ]  # Work only when SPLIT_TYPE = custom
+    SPLIT_RATIO: 0.3  # Work only when SPLIT_TYPE = ratio
+    DATA_FORMAT: *common_data_format
+    PREPROCESS: *common_preprocess
+
+INFERENCE:
+  BATCH_SIZE: 4
+  EVALUATION_METHOD: FFT
+  USE_POST_PROCESS: True
