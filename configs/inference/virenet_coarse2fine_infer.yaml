@@ -1,12 +1,12 @@
 NAME: virenet_coarse2fine_infer
 
 DATA_PATH:
-  CACHE_DIR: [your-cache-dir]
-  OUTPUT_DIR: [your-output-dir]
-  BODY_DETECTOR_PATH: [yolov8-path]  # Set to a YOLOv8 weights file if ROI cropping is enabled
-  FACE_DETECTOR_PATH: [yolov8-face-path]  # Set to a YOLOv8n-face weights file if ROI cropping is enabled
+  CACHE_DIR: /projects/song.liy/cache_dir
+  OUTPUT_DIR: ../../output
+  BODY_DETECTOR_PATH: /projects/song.liy/yolov8m.pt  # Set to a YOLOv8 weights file if ROI cropping is enabled
+  FACE_DETECTOR_PATH: /projects/song.liy/yolov8n-face.pt  # Set to a YOLOv8n-face weights file if ROI cropping is enabled
   # Provide exactly one of the following:
-  VIDEO_FILE: /absolute/path/to/video.mp4
+  VIDEO_FILE: ../../example/S04_6.mp4
   # VIDEO_DIR: /absolute/path/to/folder/with/videos
 
 MODEL:
@@ -19,7 +19,7 @@ MODEL:
 # Only TEST is required for infer.py; TRAIN/VALID are not needed
 TEST:
   DATA:
-    - DATASET: AIR_400  # Used only to set infant_flag for post-processing
+    - INFANT_FLAG: True
       DATA_FORMAT: NDCHW
       PREPROCESS:
         DO_DOWNSAMPLE_BEFORE_PREPROCESS: True
