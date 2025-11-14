@@ -114,6 +114,13 @@ def run_inference(config, model, data_loader, logger):
     post_processor = PostProcessor()
     model.eval()
 
+    def _to_float(val):
+        if isinstance(val, (list, tuple)) and val:
+            val = val[0]
+        if hasattr(val, 'item'):
+            return float(val.item())
+        return float(val)
+
     all_preds = []
     fs = None
     infant_flag = None
@@ -139,7 +146,7 @@ def run_inference(config, model, data_loader, logger):
             data = data[:valid_len]
 
             # Add one more frame for EfficientPhys since it does torch.diff for the input
-            if model_name.lower().startswith("efficientphys"):
+            if model_name.lower().startswith("efficientphys") and data.shape[0] > 0:
                 last_frame = torch.unsqueeze(data[-1, :, :, :], 0).repeat(num_of_gpu, 1, 1, 1)
                 data = torch.cat((data, last_frame), 0)
 
@@ -147,10 +154,14 @@ def run_inference(config, model, data_loader, logger):
             pred = model(data)
 
             all_preds.append(pred)
-            if fs is None:
+            if fs is None and len(fs_list):
                 fs = fs_list[0]
-            if infant_flag is None:
+                if hasattr(fs, 'item'):
+                    fs = int(fs.item())
+            if infant_flag is None and len(infant_flag_list):
                 infant_flag = infant_flag_list[0]
+                if hasattr(infant_flag, 'item'):
+                    infant_flag = bool(infant_flag.item())
 
     pred_seq = torch.cat(all_preds, dim=0).unsqueeze(0)
     pred_seq, pred_rr = post_processor.post_process(
