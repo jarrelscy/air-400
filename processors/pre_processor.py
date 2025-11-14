@@ -5,6 +5,8 @@ from multiprocessing import cpu_count, Pool
 
 import cv2
 import numpy as np
+import contextlib
+import io
 
 import pyflow
 import torch
@@ -1155,5 +1157,7 @@ def compute_pyflow_single_pair(args):
     For multiprocessing safety put this function outside the class.
     """
     prev, curr, pyflow_args = args
-    u, v, _ = pyflow.coarse2fine_flow(prev, curr, *pyflow_args)
+    # Suppress verbose stdout/stderr spam from PyFlow
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        u, v, _ = pyflow.coarse2fine_flow(prev, curr, *pyflow_args)
     return np.stack((u, v), axis=-1)
