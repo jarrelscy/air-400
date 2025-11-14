@@ -6,7 +6,8 @@ from multiprocessing import cpu_count, Pool
 import cv2
 import numpy as np
 import contextlib
-import io
+import os
+import sys
 
 import pyflow
 import torch
@@ -14,6 +15,23 @@ from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
 from torchvision.transforms import v2
 from tqdm import tqdm
 from ultralytics import YOLO
+
+
+@contextlib.contextmanager
+def _suppress_pyflow_output():
+    """Suppress verbose stdout/stderr emitted by pyflow's C++ implementation."""
+    with open(os.devnull, 'w') as devnull:
+        old_stdout_fd = os.dup(sys.stdout.fileno())
+        old_stderr_fd = os.dup(sys.stderr.fileno())
+        try:
+            os.dup2(devnull.fileno(), sys.stdout.fileno())
+            os.dup2(devnull.fileno(), sys.stderr.fileno())
+            yield
+        finally:
+            os.dup2(old_stdout_fd, sys.stdout.fileno())
+            os.dup2(old_stderr_fd, sys.stderr.fileno())
+            os.close(old_stdout_fd)
+            os.close(old_stderr_fd)
 
 
 class PreProcessor:
@@ -1157,7 +1175,6 @@ def compute_pyflow_single_pair(args):
     For multiprocessing safety put this function outside the class.
     """
     prev, curr, pyflow_args = args
-    # Suppress verbose stdout/stderr spam from PyFlow
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+    with _suppress_pyflow_output():
         u, v, _ = pyflow.coarse2fine_flow(prev, curr, *pyflow_args)
     return np.stack((u, v), axis=-1)

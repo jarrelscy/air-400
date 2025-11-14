@@ -15,7 +15,7 @@ dependencies:
   - pygifsicle=1.1.0
   - cython=3.0.11
   - av=15.0.0
-  - pip
+  - pip=25.2
   - pip:
-    - torch
-    - torchvision
+    - torch=2.8.0
+    - torchvision=0.23.0
