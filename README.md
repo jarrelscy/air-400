@@ -22,13 +22,20 @@
   </a>
 </p>
 
----
-
 This is the official repository of our **WACV 2026** paper:
 
-> Song, L.\*, Bishnoi, H.\*, Manne, S.K.R., Ostadabbas, S., Taylor, B.J., Wan, M., "Overcoming Small Data Limitations in Video-Based Infant Respiration Estimation" (*equal contribution). Under review, Preprint available on arXiv.
+> Song, L.\*, Bishnoi, H.\*, Manne, S.K.R., Ostadabbas, S., Taylor, B.J., Wan, M., "**Overcoming Small Data Limitations in Video-Based Infant Respiration Estimation**" (*equal contribution). Under review, Preprint available on arXiv.
 
-Here we provide our model code, training checkpoints, and annotated dataset to support automatic estimation of infant respiration waveforms and respiration rate from natural video footage, with the help of spatiotemporal computer vision models and infant-specific region-of-interest tracking. 
+Here we provide our **model code**, **training checkpoints**, and **annotated dataset** to support automatic estimation of **infant respiration waveforms and respiration rate** from natural video footage, with the help of spatiotemporal computer vision models and infant-specific region-of-interest tracking. 
+
+<p align="center">
+<img src="https://github.com/user-attachments/assets/e2aacfc2-fa0d-4e4d-b03f-65e555bd81a2" alt="Sample Dataset Preprocessing" width="60%"></img>
+</p>
+<p align="center">
+<i>Sample Dataset Preprocessing</i>
+</p>
+
+---
 
 ## 📋 Table of Contents
 - [Requirements & Setup](#-requirements--setup)
@@ -38,12 +45,7 @@ Here we provide our model code, training checkpoints, and annotated dataset to s
 - [Citation](#-citation)
 - [License](#-license)
 
-<p align="center">
-<img src="https://github.com/user-attachments/assets/e2aacfc2-fa0d-4e4d-b03f-65e555bd81a2" alt="Sample Dataset Preprocessing" width="50%"></img>
-</p>
-<p align="center">
-<i>Sample Dataset Preprocessing</i>
-</p>
+
 
 ## 📦 Requirements & Setup 
 
@@ -68,7 +70,7 @@ git clone https://github.com/pathak22/pyflow.git
 ## ⚡ Quickstart: Inference
 
 <p align="center">
-<img src="https://github.com/user-attachments/assets/ed03120a-5591-453a-aef3-b58b8348dd50" alt="Sample Inference Waveform" width="50%"></img>
+<img src="https://github.com/user-attachments/assets/ed03120a-5591-453a-aef3-b58b8348dd50" alt="Sample Inference Waveform" width="60%"></img>
 </p>
 <p align="center">
 <img src="https://github.com/user-attachments/assets/b8c66ec4-a379-4d50-94ff-c08689228af7" alt="Sample Waveform Plot" width="50%" />
@@ -77,14 +79,14 @@ git clone https://github.com/pathak22/pyflow.git
 <i>Sample Inference Output</i>
 </p>
 
-Use `infer.py` to preprocess input video(s) and run a trained model for respiration rate estimation.
+
 
 #### 1. Preparation
 - Download [trained model](https://drive.google.com/drive/folders/1kjSAF9Dt24D670cwBgc-uXCz8WYTaulq?usp=drive_link) and [ROI detector](https://drive.google.com/drive/folders/1k0BHMGXAXIdmOYyt3iGzbUBH_sEGVcAk?usp=drive_link) files.
-- Fill the YAML `DATA_PATH` fields. 
-  - Set paths for cache directory and output directory.
-  - Set valid detector paths (YOLO weights) if ROI cropping is enabled. Otherwise, set `DO_CROP_INFANT_REGION: False`.
-  - Set input video path.
+- Fill the `DATA_PATH` fields of config YAML in `configs/inference` folder. 
+  - Set path for **output** directory.
+  - Set valid **detector** paths (YOLO weights) if ROI cropping is enabled. Otherwise, set `DO_CROP_INFANT_REGION: False`.
+  - Set **input** video file or video folder path.
 
 ```yaml
 DATA_PATH:
@@ -96,17 +98,19 @@ DATA_PATH:
   # VIDEO_DIR: /absolute/path/to/videos/
 ```
 
-#### 2. Example run
+#### 2. Start inference process
+
+Use `run_infer.sh` to preprocess input video(s) and run a trained model for respiration rate estimation. Specify required **config YAML** file path and **model checkpoint** file path in `run_infer.sh`.
+
+Example run:
 
 ```bash
-python infer.py \
-  --config configs/inference/virenet_coarse2fine_infer.yaml \
-  --checkpoint checkpoints/virenet_coarse2fine_body.pth \
+./run_infer.sh
 ```
 
 #### 3. Outputs
-- Per-video JSON under `OUTPUT_DIR/inference/{video}_{datetime}` with prediction result JSON file and generated artifacts (HDF5 format time series and PNG format waveform plots).
-- A summary JSON across all processed videos (`summary_*.json`).
+- **Per-video JSON** under `OUTPUT_DIR/inference/{video}_{datetime}` with prediction result JSON file and generated artifacts (HDF5 format time series and PNG format waveform plots).
+- A **summary JSON** across all processed videos (`summary_{datetime}.json`).
 - Logs saved under `OUTPUT_DIR/logs/`.
 
 
@@ -174,7 +178,7 @@ AIR_400/
 export WANDB_API_KEY=<your_api_key>
 wandb login
 ```
-Set `USE_WANDB: True` in yaml file.
+Set `USE_WANDB: True` in YAML file.
 
 #### 2. Download [AIR-400 dataset](https://drive.google.com/drive/folders/12BCJ2TNjAquMHTr3A60p2sQJ9Gp7CRDt?usp=drive_link) and [ROI detector](https://drive.google.com/drive/folders/1k0BHMGXAXIdmOYyt3iGzbUBH_sEGVcAk?usp=drive_link) files.
 
@@ -192,7 +196,7 @@ DATA_PATH:
 ```
 
 #### 4. Preprocess the data
-Specify required config yaml file path in `run.sh`. Then uncomment `--preprocess` after `python main.py --config "$CONFIG"` to enable preprocess-only mode. Run this approach first to make sure dataset is preprocessed correctly before following training and testing.
+Specify required **config YAML** file path in `run.sh`. Then *uncomment* `--preprocess` after `python main.py --config "$CONFIG"` to enable **preprocess-only** mode. Run this approach first to make sure dataset is preprocessed correctly before following training and testing.
 ```bash
 ./run.sh
 ```
