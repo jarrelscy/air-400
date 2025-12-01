@@ -24,7 +24,7 @@
 
 This is the official repository of our **WACV 2026** paper:
 
-> Song, L.\*, Bishnoi, H.\*, Manne, S.K.R., Ostadabbas, S., Taylor, B.J., Wan, M., "**Overcoming Small Data Limitations in Video-Based Infant Respiration Estimation**" (*equal contribution). Under review, Preprint available on arXiv.
+> Song, L.\*, Bishnoi, H.\*, Manne, S.K.R., Ostadabbas, S., Taylor, B.J., Wan, M., "**Overcoming Small Data Limitations in Video-Based Infant Respiration Estimation**" (*equal contribution). 2026 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV).
 
 Here we provide our **model code**, **training checkpoints**, and **annotated dataset** to support automatic estimation of **infant respiration waveforms and respiration rate** from natural video footage, with the help of spatiotemporal computer vision models and infant-specific region-of-interest tracking. 
 
@@ -118,9 +118,9 @@ Example run:
 
 The [**AIR-400** dataset](https://drive.google.com/drive/folders/12BCJ2TNjAquMHTr3A60p2sQJ9Gp7CRDt?usp=drive_link) consists of two parts:
 
-- **AIR_125** — legacy dataset (8 subjects)
+- **AIR_125** — original dataset (8 subjects)
 
-- **AIR_400** — newly collected dataset (10 subjects)
+- **AIR_400** — expanded dataset (with 10 additional subjects from the same study)
 
 Each subject directory contains synchronized **video files (.mp4)** and **breathing signal annotations (.hdf5)**.
 
@@ -210,11 +210,13 @@ Comment out `--peprocess` after `python main.py --config "$CONFIG"` in `run.sh` 
 ## 📝 Citation
 
 ```bibtex
-@misc{song_bishnoi_overcoming_2025,
+
+@inproceedings{song_bishnoi_overcoming_2026,
+	booktitle = {2026 {IEEE}/{CVF} {Winter} {Conference} on {Applications} of {Computer} {Vision} ({WACV})},
+	publisher = {IEEE},
 	title = {Overcoming {Small} {Data} {Limitations} in {Video}-{Based} {Infant} {Respiration} {Estimation}},
-	url = {https://arxiv.org/abs/0000.00000},
 	author = {Song, Liyang and Bishnoi, Hardik and Manne, Sai Kumar Reddy and Ostadabbas, Sarah and Taylor, Brianna J and Wan, Michael},
-	year = {2025},
+	year = {2026},
 }
 ```
 
