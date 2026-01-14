@@ -1,0 +1,72 @@
+# Baby Monitor Service Configuration
+
+# RTSP camera stream URL
+rtsp_url: "rtsps://192.168.0.1:7441/PN2dhbRgMjI37Uax?enableSrtp"
+
+# Update interval in seconds
+update_interval: 10
+
+# Watchdog timeout - force reconnect if no frames received for this many seconds
+watchdog_timeout: 120
+
+# Target FPS for frame capture
+target_fps: 30
+
+# Entity prefix for Home Assistant sensors
+entity_prefix: "sensor.baby_monitor"
+
+# Perspective correction settings (automatic - detects non-zero content region)
+perspective:
+  # Output size after perspective correction (width, height)
+  output_size: [480, 640]
+
+  # Number of frames to collect for calibration (more = more robust detection)
+  calibration_frames: 10
+
+  # Recalibration interval in seconds (must be > 30 to allow buffer to fill)
+  recalibration_interval: 60
+
+# Detection settings
+detection:
+  # Path to YOLO body detector weights
+  body_detector_path: "/app/models_pretrained/detectors/yolov8m.pt"
+
+  # Path to YOLO face detector weights
+  face_detector_path: "/app/models_pretrained/detectors/yolov8n-face.pt"
+
+  # Confidence thresholds (very low for infant/infrared detection)
+  body_conf_threshold: 0.05
+  face_conf_threshold: 0.05
+
+# Respiration estimation settings
+respiration:
+  # Path to VIRENet model checkpoint
+  checkpoint_path: "/app/models_pretrained/checkpoint/VIRENet_Coarse2fine_Body_best.pth"
+
+  # Model parameters (must match trained model)
+  frame_depth: 10
+  img_size: 96
+  in_channels: 3
+
+  # Number of frames needed for estimation (6 seconds at 30fps = 180 frames, matches training)
+  chunk_length: 180
+
+  # Target FPS for respiration analysis
+  target_fps: 30
+
+  # Minimum interval between inference runs in seconds (default 30)
+  # This controls how often we calculate respiratory rate, not frame collection
+  inference_interval: 30
+
+# Home Assistant connection settings
+homeassistant:
+  # Home Assistant URL (use host.docker.internal if running in container)
+  ha_url: "http://host.docker.internal:8123"
+
+  # Long-lived access token (set via environment variable HA_TOKEN)
+  ha_token: ""
+
+# Logging settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
