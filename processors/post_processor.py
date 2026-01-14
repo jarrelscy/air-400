@@ -109,7 +109,9 @@ class PostProcessor:
     ) -> float:
         """Estimate RR using the dominant Fast Fourier Transform (FFT) bin within a passband."""
         ppg_signal = np.expand_dims(signal_input, axis=0)
-        n = 1 if ppg_signal.shape[1] == 0 else 2 ** (ppg_signal.shape[1] - 1).bit_length()
+        # Use larger nfft for finer frequency resolution (zero-padding)
+        # nfft=2048 gives ~0.88 BPM resolution at 30fps vs ~7 BPM with nfft=256
+        n = 2048
         f_ppg, pxx_ppg = signal.periodogram(ppg_signal, fs=fs, nfft=n, detrend=False)
         fmask_ppg = np.argwhere((f_ppg >= low_pass) & (f_ppg <= high_pass))
         mask_ppg = np.take(f_ppg, fmask_ppg)
@@ -117,7 +119,18 @@ class PostProcessor:
         # Handle empty mask
         if len(mask_pxx) == 0 or len(mask_ppg) == 0:
             return 0.0
-        return np.take(mask_ppg, np.argmax(mask_pxx, 0))[0] * 60  # bpm
+        # Find peak and use parabolic interpolation for sub-bin accuracy
+        peak_idx = np.argmax(mask_pxx, 0)[0]
+        peak_freq = mask_ppg[peak_idx][0]
+        # Parabolic interpolation if we have neighboring bins
+        if 0 < peak_idx < len(mask_pxx) - 1:
+            alpha = np.log(mask_pxx[peak_idx - 1][0] + 1e-10)
+            beta = np.log(mask_pxx[peak_idx][0] + 1e-10)
+            gamma = np.log(mask_pxx[peak_idx + 1][0] + 1e-10)
+            p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma)
+            freq_step = f_ppg[1] - f_ppg[0]
+            peak_freq = peak_freq + p * freq_step
+        return peak_freq * 60  # bpm
 
     @staticmethod
     def _calculate_peak_rr(signal_input: np.ndarray, fs: int) -> float:
