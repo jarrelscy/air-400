@@ -49,14 +49,20 @@ respiration:
   in_channels: 3
 
   # Number of frames needed for estimation (6 seconds at 30fps = 180 frames, matches training)
-  chunk_length: 180
+  chunk_length: 450
 
   # Target FPS for respiration analysis
   target_fps: 30
 
-  # Minimum interval between inference runs in seconds (default 30)
-  # This controls how often we calculate respiratory rate, not frame collection
+  # Minimum interval between respiration inference runs in seconds
+  # This controls how often we calculate respiratory rate (requires baby detection)
   inference_interval: 30
+
+  # Movement detection interval in seconds (runs always, no detection required)
+  movement_interval: 3
+
+  # Number of frames for movement calculation (3 seconds at 30fps = 90 frames)
+  movement_frames: 90
 
 # Home Assistant connection settings
 homeassistant:

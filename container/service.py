@@ -227,6 +227,37 @@ class BabyDetector:
         self.body_conf_threshold = config.get('body_conf_threshold', 0.25)
         self.face_conf_threshold = config.get('face_conf_threshold', 0.5)
 
+    def preprocess_for_detection(self, frame: np.ndarray) -> np.ndarray:
+        """Preprocess IR/grayscale images to improve detection.
+
+        Applies CLAHE and pseudo-coloring to make IR images more recognizable
+        to YOLO models trained on color images.
+        """
+        # Check if image appears to be IR/grayscale (low color variance)
+        if len(frame.shape) == 3 and frame.shape[2] == 3:
+            # Calculate color variance to detect IR images
+            b, g, r = frame[:,:,0], frame[:,:,1], frame[:,:,2]
+            color_diff = np.abs(r.astype(float) - g.astype(float)).mean() + \
+                         np.abs(g.astype(float) - b.astype(float)).mean()
+
+            is_ir = color_diff < 10  # Low color difference indicates IR/grayscale
+
+            if is_ir:
+                # Convert to grayscale
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+                # Apply CLAHE for better contrast
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                enhanced = clahe.apply(gray)
+
+                # Apply color map to create pseudo-color image
+                # COLORMAP_BONE gives skin-like tones which may help person detection
+                colored = cv2.applyColorMap(enhanced, cv2.COLORMAP_BONE)
+                frame = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
+                logger.debug("Applied CLAHE + COLORMAP_BONE preprocessing for IR image")
+
+        return frame
+
     def detect(self, frame: np.ndarray) -> Dict[str, Any]:
         """Detect baby body and face in frame."""
         result = {
@@ -238,6 +269,9 @@ class BabyDetector:
             'face_confidence': 0.0
         }
 
+        # Preprocess frame for better IR detection
+        processed_frame = self.preprocess_for_detection(frame)
+
         # Log frame info for debugging
         logger.info(f"Detection input frame: shape={frame.shape}, dtype={frame.dtype}, min={frame.min()}, max={frame.max()}")
 
@@ -245,7 +279,7 @@ class BabyDetector:
         if self.body_detector:
             try:
                 detections = self.body_detector(
-                    frame,
+                    processed_frame,
                     conf=self.body_conf_threshold,
                     device=self.device,
                     verbose=False
@@ -274,7 +308,7 @@ class BabyDetector:
         if self.face_detector:
             try:
                 detections = self.face_detector(
-                    frame,
+                    processed_frame,
                     conf=self.face_conf_threshold,
                     device=self.device,
                     verbose=False
@@ -374,8 +408,12 @@ class RespirationEstimator:
             logger.error(f"Failed to load model: {e}")
             self.model = None
 
-    def preprocess_frames(self, frames: np.ndarray, roi_box: Optional[List[float]] = None) -> np.ndarray:
-        """Preprocess frames for inference using repo's PreProcessor with optical flow."""
+    def preprocess_frames(self, frames: np.ndarray, roi_box: Optional[List[float]] = None) -> Tuple[np.ndarray, np.ndarray]:
+        """Preprocess frames for inference using repo's PreProcessor with optical flow.
+
+        Returns:
+            Tuple of (processed_frames for model, raw_flow for magnitude calculation)
+        """
         # Crop to ROI if provided
         if roi_box:
             x1, y1, x2, y2 = map(int, roi_box)
@@ -389,29 +427,97 @@ class RespirationEstimator:
 
         # Use PreProcessor's optical flow computation (coarse2fine via pyflow)
         logger.info(f"Computing optical flow for {len(resized)} frames...")
-        flow = self.pre_processor.compute_pyflow(resized.astype(np.uint8))  # (T, H, W, 3)
-        logger.info(f"Optical flow computed: shape={flow.shape}")
+        flow_raw = self.pre_processor.compute_pyflow(resized.astype(np.uint8))  # (T, H, W, 3)
+        logger.info(f"Optical flow computed: shape={flow_raw.shape}")
 
-        # Normalize flow (Standardized)
-        flow = self.pre_processor._standardize(flow)
+        # Normalize flow (Standardized) for model input
+        flow_norm = self.pre_processor._standardize(flow_raw)
 
         # Normalize frames (Standardized)
         frames_norm = self.pre_processor._standardize(resized)
 
         # Concatenate: flow (3ch) + frames (3ch) = 6 channels
-        combined = np.concatenate([flow, frames_norm], axis=-1)  # (T, H, W, 6)
+        combined = np.concatenate([flow_norm, frames_norm], axis=-1)  # (T, H, W, 6)
 
         logger.info(f"Preprocessed frames: shape={combined.shape}")
-        return combined  # Return 6 channels (flow + RGB)
+        return combined, flow_raw  # Return processed frames AND raw flow
 
-    def estimate(self, frames: np.ndarray, roi_box: Optional[List[float]] = None) -> Optional[float]:
-        """Estimate respiratory rate from frames."""
-        if self.model is None or len(frames) < self.chunk_length:
+    def compute_movement(self, frames: np.ndarray, num_frames: int = 90) -> Optional[float]:
+        """Compute movement (optical flow magnitude) without running respiration model.
+
+        This is a lightweight version that only computes optical flow for movement detection.
+        Uses fewer frames (default 90 = 3 seconds at 30fps) for faster computation.
+
+        Args:
+            frames: Array of frames (T, H, W, C)
+            num_frames: Number of frames to use (default 90 = 3 seconds at 30fps)
+
+        Returns:
+            Average optical flow magnitude per pixel, or None on error
+        """
+        if len(frames) < num_frames:
+            logger.debug(f"Not enough frames for movement: {len(frames)}/{num_frames}")
             return None
 
         try:
-            # Preprocess (returns 6 channels: flow + RGB)
-            processed = self.preprocess_frames(frames[-self.chunk_length:], roi_box)
+            # Use last num_frames
+            frames_subset = frames[-num_frames:]
+
+            # Resize frames to target size
+            resized = np.array([
+                cv2.resize(f, (self.img_size, self.img_size))
+                for f in frames_subset
+            ], dtype=np.float32)
+
+            # Compute optical flow
+            logger.debug(f"Computing movement optical flow for {len(resized)} frames...")
+            flow_raw = self.pre_processor.compute_pyflow(resized.astype(np.uint8))  # (T, H, W, 3)
+
+            # Compute magnitude from u, v components
+            flow_u = flow_raw[:, :, :, 0]
+            flow_v = flow_raw[:, :, :, 1]
+            flow_magnitude = np.sqrt(flow_u**2 + flow_v**2)
+
+            # Average magnitude per pixel
+            total_optical_flow = float(np.mean(flow_magnitude))
+            logger.debug(f"Movement optical flow: {total_optical_flow:.4f}")
+
+            return total_optical_flow
+
+        except Exception as e:
+            logger.error(f"Movement computation error: {e}")
+            return None
+
+    def estimate(self, frames: np.ndarray, roi_box: Optional[List[float]] = None) -> Tuple[Optional[float], Optional[float]]:
+        """Estimate respiratory rate from frames.
+
+        Returns:
+            Tuple of (respiratory_rate, total_optical_flow)
+        """
+        if self.model is None or len(frames) < self.chunk_length:
+            return None, None
+
+        try:
+            # Compute optical flow on FULL frame (no ROI crop) for movement detection
+            processed_full, flow_raw_full = self.preprocess_frames(frames[-self.chunk_length:], roi_box=None)
+
+            # Compute total optical flow magnitude from RAW (unnormalized) flow
+            # Flow is in first 2 channels (u, v components)
+            flow_u = flow_raw_full[:, :, :, 0]  # (T, H, W)
+            flow_v = flow_raw_full[:, :, :, 1]  # (T, H, W)
+            flow_magnitude = np.sqrt(flow_u**2 + flow_v**2)  # (T, H, W)
+
+            # Average magnitude per pixel, averaged across frames (normalized by resolution)
+            total_optical_flow = float(np.mean(flow_magnitude))
+            logger.info(f"Total optical flow (full cot, per-pixel avg): {total_optical_flow:.4f}")
+
+            # Preprocess with body ROI for respiration estimation (if available)
+            if roi_box is not None:
+                processed, _ = self.preprocess_frames(frames[-self.chunk_length:], roi_box)
+                logger.info(f"Using body ROI for respiration: {roi_box}")
+            else:
+                processed = processed_full
+                logger.info("No body ROI available, using full frame for respiration")
 
             # Convert to tensor: (T, H, W, 6) -> (1, T, 6, H, W)
             tensor = torch.from_numpy(processed).permute(0, 3, 1, 2).unsqueeze(0)
@@ -451,11 +557,11 @@ class RespirationEstimator:
             # Save waveform plot
             self._save_waveform(pred_wave, pred_rr)
 
-            return float(pred_rr)
+            return float(pred_rr), total_optical_flow
 
         except Exception as e:
             logger.error(f"Respiration estimation error: {e}")
-            return None
+            return None, None
 
     def _save_waveform(self, waveform: np.ndarray, resp_rate: float) -> None:
         """Save respiratory waveform plot to PNG and data to CSV."""
@@ -735,6 +841,11 @@ class BabyMonitorService:
         self.inference_interval = self.config.get('respiration', {}).get('inference_interval', 30)
         self.last_inference = 0
 
+        # Movement detection interval (runs always, no detection required)
+        self.movement_interval = self.config.get('respiration', {}).get('movement_interval', 3)
+        self.movement_frames = self.config.get('respiration', {}).get('movement_frames', 90)
+        self.last_movement_check = 0
+
         # Watchdog settings - restart stream if no frames for X seconds
         self.watchdog_timeout = self.config.get('watchdog_timeout', 120)  # 2 minutes default
         self.last_frame_time = time.time()
@@ -808,8 +919,33 @@ class BabyMonitorService:
                 # Apply perspective correction
                 corrected = self.perspective.correct(frame)
 
-                # Add to frame buffer
-                self.frame_buffer.append(corrected)
+                # Only add to frame buffer after perspective is calibrated (ensures consistent frame sizes)
+                if self.perspective.calibrated:
+                    self.frame_buffer.append(corrected)
+
+                # Movement check - runs every 3 seconds, always (no detection required)
+                # Only run after perspective calibration to ensure consistent frame sizes
+                if self.perspective.calibrated and current_time - self.last_movement_check >= self.movement_interval:
+                    buffer_size = len(self.frame_buffer)
+                    if buffer_size >= self.movement_frames:
+                        logger.info(f"Computing movement (interval={self.movement_interval}s)...")
+                        frames_array = np.array(list(self.frame_buffer))
+                        movement = self.estimator.compute_movement(frames_array, num_frames=self.movement_frames)
+                        if movement is not None:
+                            logger.info(f"Movement (optical flow): {movement:.6f}")
+                            timestamp = datetime.now().isoformat()
+                            self.ha_client.update_sensor(
+                                f"{self.entity_prefix}_optical_flow",
+                                round(movement, 6),
+                                {
+                                    'unit_of_measurement': 'px/frame',
+                                    'friendly_name': 'Baby Cot Movement',
+                                    'unique_id': 'baby_monitor_optical_flow',
+                                    'icon': 'mdi:motion-sensor',
+                                    'last_updated': timestamp
+                                }
+                            )
+                    self.last_movement_check = current_time
 
                 # Check if it's time to update
                 if current_time - last_update >= self.update_interval:
@@ -875,6 +1011,7 @@ class BabyMonitorService:
         # Respiration estimation - trigger if any of last 5 cycles detected baby
         # and sufficient time has passed since last inference
         resp_rate = None
+        total_optical_flow = None
         any_recent_detection = any(self.detection_history)
         buffer_size = len(self.frame_buffer)
         current_time = time.time()
@@ -884,10 +1021,10 @@ class BabyMonitorService:
         if any_recent_detection and buffer_size >= self.estimator.chunk_length and time_since_inference >= self.inference_interval:
             logger.info(f"Calculating respiratory rate (interval={self.inference_interval}s)...")
             frames_array = np.array(list(self.frame_buffer))
-            # Use body box if available, otherwise None (will use full frame)
-            resp_rate = self.estimator.estimate(frames_array, detection_result['body_box'])
+            # Optical flow uses full cot, respiration uses body ROI if available
+            resp_rate, total_optical_flow = self.estimator.estimate(frames_array, roi_box=detection_result['body_box'])
             self.last_inference = current_time
-            logger.info(f"Respiratory rate result: {resp_rate}")
+            logger.info(f"Respiratory rate result: {resp_rate}, Total optical flow: {total_optical_flow}")
 
         # Update Home Assistant sensors
         timestamp = datetime.now().isoformat()
@@ -947,10 +1084,12 @@ class BabyMonitorService:
                 }
             )
 
+        # Note: optical flow (movement) is now updated separately every 3 seconds in the main loop
+
         logger.info(
             f"Updated sensors - Body: {detection_result['body_detected']}, "
             f"Face: {detection_result['face_detected']}, "
-            f"Resp Rate: {resp_rate}"
+            f"Resp Rate: {resp_rate}, Optical Flow: {total_optical_flow}"
         )
 
 
