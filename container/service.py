@@ -1073,7 +1073,7 @@ class BabyMonitorService:
         else:
             self.ha_client.update_sensor(
                 f"{self.entity_prefix}_respiratory_rate",
-                'unknown',
+                None,
                 {
                     'unit_of_measurement': 'bpm',
                     'friendly_name': 'Baby Respiratory Rate',
